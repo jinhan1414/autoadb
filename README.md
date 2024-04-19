@@ -1,25 +1,20 @@
 # AutoAdb
 
 This command-line tool allows to execute a command whenever a new device is
-connected to adb.
+connected to adb or disconnected.
+
+Usage: autoadb.exe <connect_command> [disconnect_command]
 
 For example, to execute `printf` on device connection:
 
 ```bash
-autoadb printf 'Device connected\n'
+autoadb 1.bat 2.bat
 ```
-
-`{}` replaces the `serial` of the device detected:
 
 ```bash
-autoadb printf 'Device %s connected\n' '{}'
+autoadb 1.bat
 ```
 
-It may be used to start [scrcpy]:
-
-```bash
-autoadb scrcpy -s '{}'
-```
 
 [scrcpy]: https://github.com/Genymobile/scrcpy
 

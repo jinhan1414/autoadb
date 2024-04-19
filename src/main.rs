@@ -22,13 +22,23 @@ use std::env;
 use std::process::Command;
 
 struct AutoAdb {
-    command: Vec<String>,
+    connect_command: Vec<String>,
+    disconnect_command: Vec<Option<String>>,
+}
+
+impl AutoAdb {
+    fn new(connect_command: Vec<String>, disconnect_command: Vec<Option<String>>) -> Self {
+        Self {
+            connect_command,
+            disconnect_command,
+        }
+    }
 }
 
 impl AdbMonitorCallback for AutoAdb {
     fn on_new_device_connected(&self, serial: &str) {
         let cmd = self
-            .command
+            .connect_command
             .iter()
             .map(|value| {
                 // replace any {} parameter by the actual serial
@@ -45,15 +55,50 @@ impl AdbMonitorCallback for AutoAdb {
             eprintln!("Could not execute {:?}: {}", cmd, err);
         }
     }
+	// 新添加的设备断开连接回调函数
+    fn on_device_disconnected(&self, serial: &str) {
+    println!("Device disconnected: {}", serial);
+    
+    if let Some(cmd) = &self.disconnect_command[0] {
+        let cmd = cmd
+            .split_whitespace()
+            .map(|value| {
+                // replace any {} parameter by the actual serial
+                if "{}" == value {
+                    serial.to_string()
+                } else {
+                    value.to_string()
+                }
+            })
+            .collect::<Vec<_>>();
+        let process = Command::new(&cmd[0]).args(&cmd[1..]).spawn();
+        if let Err(err) = process {
+            eprintln!("Could not execute {:?}: {}", cmd, err);
+        }
+    }
+    }
 }
 
 fn main() {
-    let command = env::args().skip(1).collect::<Vec<_>>();
-    if command.is_empty() {
-        eprintln!("No arguments given");
+    // 获取命令行参数
+    let args: Vec<String> = env::args().collect();
+
+    // 确保至少有2个参数：可执行文件名、连接时的命令,断开连接时的命令可选
+    if args.len() < 2 {
+        eprintln!("Usage: {} <connect_command> [disconnect_command]", args[0]);
         return;
     }
-    let auto_adb = AutoAdb { command };
+
+    let connect_command = vec![args[1].clone()]; // 第一个参数是连接时的命令，需要包装为 Vec<String>
+    let disconnect_command = if args.len() > 2 {
+        vec![Some(args[2].clone())] // 如果提供了第二个参数，则将其作为断开连接时的命令
+    } else {
+        vec![None] // 如果没有提供第二个参数，则断开连接时的命令为空
+    };
+
+    // 创建 AutoAdb 实例并传递命令
+    let auto_adb = AutoAdb::new(connect_command, disconnect_command);
+	
     let mut adb_monitor = AdbMonitor::new(Box::new(auto_adb));
     adb_monitor.monitor();
 }

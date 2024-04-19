@@ -29,6 +29,8 @@ const TAG: &str = "AdbMonitor";
 
 pub trait AdbMonitorCallback {
     fn on_new_device_connected(&self, serial: &str);
+	fn on_device_disconnected(&self, serial: &str);
+
 }
 
 impl<F> AdbMonitorCallback for F
@@ -36,6 +38,9 @@ where
     F: Fn(&str),
 {
     fn on_new_device_connected(&self, serial: &str) {
+        self(serial);
+    }
+	fn on_device_disconnected(&self, serial: &str) {
         self(serial);
     }
 }
@@ -158,7 +163,15 @@ impl AdbMonitor {
 
     fn handle_packet(&mut self, packet: &str) {
         let current_connected_devices = self.parse_connected_devices(packet);
-        for serial in &current_connected_devices {
+        
+		// 处理设备断开连接
+        for connected_device in &self.connected_devices {
+            if !current_connected_devices.contains(connected_device) {
+                self.callback.on_device_disconnected(connected_device);
+            }
+        }
+		
+		for serial in &current_connected_devices {
             if !self.connected_devices.contains(serial) {
                 self.callback.on_new_device_connected(serial.as_str());
             }
