@@ -19,11 +19,14 @@ mod byte_buffer;
 
 use crate::adb_monitor::{AdbMonitor, AdbMonitorCallback};
 use std::env;
-use std::process::Command;
+use std::process::{Command, Child};
+
 
 struct AutoAdb {
     connect_command: Vec<String>,
     disconnect_command: Vec<Option<String>>,
+	connected_process: Option<Child>, // 用于存储设备连接时执行的进程
+
 }
 
 impl AutoAdb {
@@ -31,12 +34,14 @@ impl AutoAdb {
         Self {
             connect_command,
             disconnect_command,
+			connected_process: None,
+
         }
     }
 }
 
 impl AdbMonitorCallback for AutoAdb {
-    fn on_new_device_connected(&self, serial: &str) {
+    fn on_new_device_connected(&mut self, serial: &str) {
         let cmd = self
             .connect_command
             .iter()
@@ -50,15 +55,23 @@ impl AdbMonitorCallback for AutoAdb {
             })
             .collect::<Vec<_>>();
         println!("Detected device {}", serial);
-        let process = Command::new(&cmd[0]).args(cmd.iter().skip(1)).spawn();
-        if let Err(err) = process {
-            eprintln!("Could not execute {:?}: {}", cmd, err);
+        if let Ok(process) = Command::new(&cmd[0]).args(cmd.iter().skip(1)).spawn() {
+            self.connected_process = Some(process);
+        } else {
+            eprintln!("Could not execute {:?}", cmd);
         }
     }
 	// 新添加的设备断开连接回调函数
-    fn on_device_disconnected(&self, serial: &str) {
+    fn on_device_disconnected(&mut self, serial: &str) {
     println!("Device disconnected: {}", serial);
     
+ // 停止设备连接时执行的程序
+	if let Some(mut process) = self.connected_process.take() {
+		if let Err(err) = process.kill() {
+			eprintln!("Error stopping connected process: {}", err);
+		}
+	}
+	
     if let Some(cmd) = &self.disconnect_command[0] {
         let cmd = cmd
             .split_whitespace()

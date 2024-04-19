@@ -28,8 +28,8 @@ use std::time::Duration;
 const TAG: &str = "AdbMonitor";
 
 pub trait AdbMonitorCallback {
-    fn on_new_device_connected(&self, serial: &str);
-	fn on_device_disconnected(&self, serial: &str);
+    fn on_new_device_connected(&mut self, serial: &str);
+	fn on_device_disconnected(&mut self, serial: &str);
 
 }
 
@@ -37,10 +37,10 @@ impl<F> AdbMonitorCallback for F
 where
     F: Fn(&str),
 {
-    fn on_new_device_connected(&self, serial: &str) {
+    fn on_new_device_connected(&mut self, serial: &str) {
         self(serial);
     }
-	fn on_device_disconnected(&self, serial: &str) {
+	fn on_device_disconnected(&mut self, serial: &str) {
         self(serial);
     }
 }
